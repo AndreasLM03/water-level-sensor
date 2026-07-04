@@ -1,4 +1,4 @@
-# tank-meter
+# water-level-sensor
 
 Zisternen-Füllstand messen mit einem ESP32, MicroPython und MQTT — angebunden an Loxone, aber genauso mit Home Assistant, ioBroker oder jedem anderen MQTT-fähigen System nutzbar.
 
