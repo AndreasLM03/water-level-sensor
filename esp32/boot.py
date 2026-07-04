@@ -1,9 +1,7 @@
 import network
 import time
 import machine
-
-WIFI_SSID = "DEIN_WLAN"
-WIFI_PASSWORD = "DEIN_WLAN_PASSWORT"
+import config
 
 # Ein Watchdog schon hier schuetzt auch die WLAN-Verbindungsphase beim Boot.
 # main.py legt keinen zweiten WDT an, sondern nutzt dieses globale Objekt weiter,
@@ -17,7 +15,7 @@ def connect_wifi():
     while not wlan.isconnected():
         wdt.feed()
         try:
-            wlan.connect(WIFI_SSID, WIFI_PASSWORD)
+            wlan.connect(config.WIFI_SSID, config.WIFI_PASSWORD)
         except OSError:
             pass
         for _ in range(20):

@@ -87,7 +87,7 @@ Ich habe bewusst gegen ein paar naheliegende Alternativen entschieden — hier d
 
 1. Rohr/Eimer mit Wasser füllen, exakt **1000mm Tiefe** messen (Referenzpunkt: die Druckmembran der Sonde, siehe Sondenspitze).
 2. Sonde bis zu dieser Tiefe eintauchen, 30s warten, Spannung ablesen → **U₁** bei **H1_MM = 1000**.
-3. In `esp32/main.py` eintragen: `U0`, `U1`, `H1_MM`. Der Rest (`K`) wird automatisch berechnet.
+3. In `esp32/config.py` eintragen: `U0`, `U1`, `H1_MM`. Der Rest (`K`) wird in `main.py` automatisch berechnet.
 4. **Warum das funktioniert, egal wie ungenau der Widerstand ist:** Die Formel `K = H1_MM / (U1 - U0)` nutzt deine *gemessenen* Spannungen, nicht den Nennwert des Widerstands oder Herstellerangaben — Fertigungstoleranzen kürzen sich dadurch automatisch raus.
 
 ## Schritt 4: Firmware (MicroPython)
@@ -104,7 +104,10 @@ Ich habe bewusst gegen ein paar naheliegende Alternativen entschieden — hier d
    ```
    Danach prüfen, dass beide Dateien wirklich da sind: `import os; os.listdir("/lib/umqtt")` sollte `simple.py` und `robust.py` zeigen. Falls nicht, beide manuell von [micropython-lib](https://github.com/micropython/micropython-lib/tree/master/micropython/umqtt.robust) hochladen.
    Für den ADC-Treiber gibt es kein mip-Paket: [ads1x15.py](https://github.com/robert-hh/ads1x15/blob/master/ads1x15.py) herunterladen und per Thonny-Dateimanager hochladen.
-4. [esp32/boot.py](esp32/boot.py) und [esp32/main.py](esp32/main.py) hochladen, WLAN-Zugangsdaten und Kalibrierwerte eintragen.
+4. [esp32/boot.py](esp32/boot.py) und [esp32/main.py](esp32/main.py) hochladen.
+5. [esp32/config.example.py](esp32/config.example.py) lokal zu `esp32/config.py` kopieren, WLAN-Zugangsdaten, MQTT-Zugangsdaten und Kalibrierwerte darin eintragen, dann `config.py` ebenfalls auf den ESP32 hochladen.
+
+   `config.py` steht in `.gitignore` und wird nie committet — nur `config.example.py` (die Vorlage mit Platzhaltern) landet im Repo. So kann niemand aus Versehen sein WLAN-Passwort öffentlich auf GitHub pushen.
 
 ### Debug-Workflow
 
@@ -119,7 +122,7 @@ Ich habe bewusst gegen ein paar naheliegende Alternativen entschieden — hier d
 
 ### Schwellwert für die adaptive Frequenz ermitteln
 
-`CHANGE_THRESHOLD_MM` in `main.py` ist ein Startwert, kein Naturgesetz — er muss zur tatsächlichen Rauschstreuung deines Aufbaus passen:
+`CHANGE_THRESHOLD_MM` in `config.py` ist ein Startwert, kein Naturgesetz — er muss zur tatsächlichen Rauschstreuung deines Aufbaus passen:
 
 1. Nach der Installation, bei ruhigem Wasserstand, 20x hintereinander `level_mm()` in der REPL aufrufen und die Werte notieren.
 2. Die Streuung (max − min) ablesen.
@@ -140,7 +143,7 @@ Testen:
 mosquitto_sub -h <IP-deines-Servers> -u esp32 -P <dein-Passwort> -t 'zisterne/#' -v
 ```
 
-`MQTT_BROKER`, `MQTT_USER`, `MQTT_PASSWORD` in `main.py` entsprechend eintragen.
+`MQTT_BROKER`, `MQTT_USER`, `MQTT_PASSWORD` in `esp32/config.py` entsprechend eintragen.
 
 ## Schritt 6: Einbau in die Zisterne
 
@@ -167,7 +170,8 @@ Der Loxone Miniserver (Gen 2 bzw. aktuelle Firmware) ist ein **MQTT-Client**, ke
 | Wert driftet langsam über Tage, ohne dass sich der Pegel ändert | Belüftungsröhrchen der Sonde blockiert (Luftdruck statt Wasserdruck), oder Kalibrierpunkt neu aufnehmen |
 | ESP32 resettet ungefähr alle 5 Minuten | Watchdog-Fix aus Schritt 4 fehlt/wurde entfernt |
 | Ständig im "schnellen" Messintervall | `CHANGE_THRESHOLD_MM` zu niedrig für das reale Rauschen, siehe Schritt 4 |
-| MQTT verbindet nicht | Broker-IP/Zugangsdaten in `main.py` prüfen, `mosquitto_sub` vom PC aus testen |
+| MQTT verbindet nicht | Broker-IP/Zugangsdaten in `esp32/config.py` prüfen, `mosquitto_sub` vom PC aus testen |
+| `ImportError: no module named 'config'` | `config.py` fehlt auf dem ESP32 — `config.example.py` kopieren, ausfüllen, hochladen |
 
 ## Lizenz
 
