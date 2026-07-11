@@ -17,6 +17,14 @@ def connect_wifi():
     wlan.active(True)
     while not wlan.isconnected():
         wdt.feed()
+        # Vor jedem Versuch sauber trennen - ein erneutes connect() auf einer
+        # Schnittstelle, die noch mit dem letzten Versuch beschaeftigt ist, kann
+        # den WLAN-Treiber in einen Zustand bringen, der auf C-Ebene haengt und
+        # sich per Python-seitigem feed() nicht mehr retten laesst.
+        try:
+            wlan.disconnect()
+        except OSError:
+            pass
         try:
             wlan.connect(config.WIFI_SSID, config.WIFI_PASSWORD)
         except OSError:

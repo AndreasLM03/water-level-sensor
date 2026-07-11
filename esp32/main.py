@@ -123,6 +123,10 @@ def main():
             last_mm = mm
 
         except OSError:
+            # Nicht blind MQTT neu verbinden - falls das WLAN selbst weg ist
+            # (z.B. Router kurz offline), bringt ein MQTT-Reconnect allein nichts.
+            if not network.WLAN(network.STA_IF).isconnected():
+                connect_wifi()
             try:
                 client = connect_mqtt()
             except OSError:
