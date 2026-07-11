@@ -14,6 +14,12 @@ wdt = machine.WDT(timeout=120000)
 
 def connect_wifi():
     wlan = network.WLAN(network.STA_IF)
+    # Erst aus- und wieder einschalten erzwingt einen echten Reset des WLAN-Treibers.
+    # Wichtig nach einem Soft-Reboot (z.B. Thonnys "Restart"): der setzt nur die
+    # Python-Ebene zurueck, nicht den Funkchip darunter - der kann sonst in einem
+    # alten/haengenden Zustand von vor dem Neustart weiterlaufen.
+    wlan.active(False)
+    time.sleep(1)
     wlan.active(True)
     while not wlan.isconnected():
         wdt.feed()
