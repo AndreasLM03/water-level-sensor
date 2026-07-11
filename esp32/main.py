@@ -50,7 +50,10 @@ def connect_mqtt():
         password=config.MQTT_PASSWORD,
         keepalive=60,
     )
-    client.connect()
+    # Ohne explizites Timeout blockiert der zugrundeliegende Socket bei jedem
+    # publish()/ping() unbegrenzt, falls die TCP-Verbindung nach einem WLAN-Haenger
+    # "halb offen" haengen bleibt - das haette bisher kein wdt.feed() retten koennen.
+    client.connect(timeout=10)
     return client
 
 
