@@ -117,7 +117,7 @@ Ich habe bewusst gegen ein paar naheliegende Alternativen entschieden — hier d
    ads.read()           # Rohwert, mit Multimeter-Spannung vergleichen
    ```
 2. Erst wenn WLAN, Sensor und MQTT einzeln funktionieren: ESP32 einmal resetten (Knopf oder Stecker) — ab da läuft `main.py` automatisch beim Einschalten, auch ohne PC. Das ist der Produktivbetrieb.
-3. **Debugging nach dem Einbau (kein USB-Zugriff mehr):** Das Topic `zisterne/status` enthält WLAN-Signalstärke, Laufzeit und aktuelles Messintervall als JSON — mit z.B. **MQTT Explorer** von unterwegs prüfbar.
+3. **Debugging nach dem Einbau (kein USB-Zugriff mehr):** Das Topic `zisterne/status` enthält WLAN-Signalstärke, Laufzeit, aktuelles Messintervall und `sensor_ok` (ob der ADS1115 gerade am I2C-Bus gefunden wird) als JSON — mit z.B. **MQTT Explorer** von unterwegs prüfbar. Ist keine Messhardware angeschlossen (z.B. beim Software-Test), sendet der ESP32 weiterhin brav seinen Status mit `sensor_ok: false`, versucht aber keine Messung.
 4. Der Watchdog (`machine.WDT`, siehe `boot.py`) setzt den ESP32 automatisch zurück, falls die Schleife hängt. **Wichtig:** Sein Timeout (60s) ist kürzer als das lange Messintervall (300s) — deshalb schläft `main.py` in 5-Sekunden-Häppchen mit `feed()` dazwischen, statt am Stück 300s zu schlafen. Ohne diesen Kniff würde sich der ESP32 alle 5 Minuten selbst neu starten.
 
 ### Schwellwert für die adaptive Frequenz ermitteln

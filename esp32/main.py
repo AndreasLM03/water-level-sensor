@@ -14,10 +14,15 @@ TOPIC_LITER = b"zisterne/fuellstand/liter"
 TOPIC_PERCENT = b"zisterne/fuellstand/prozent"
 TOPIC_STATUS = b"zisterne/status"
 
+ADS_ADDRESS = 0x48
 i2c = I2C(0, scl=Pin(22), sda=Pin(21), freq=400000)
 # gain=1 -> +-4.096V Messbereich. Bei 100Ohm-Shunt liegt das Signal bei 0.4-2.0V;
 # die Reserve nach oben faengt den <200%-Ueberlastfall der Sonde laut Datenblatt ab.
-ads = ADS1115(i2c, address=0x48, gain=1)
+ads = ADS1115(i2c, address=ADS_ADDRESS, gain=1)
+
+
+def sensor_present():
+    return ADS_ADDRESS in i2c.scan()
 
 
 def read_voltage(samples=8):
@@ -49,12 +54,13 @@ def connect_mqtt():
     return client
 
 
-def publish_status(client, interval):
+def publish_status(client, interval, sensor_ok):
     wlan = network.WLAN(network.STA_IF)
     status = {
         "rssi": wlan.status("rssi"),
         "uptime_s": time.ticks_ms() // 1000,
         "interval_s": interval,
+        "sensor_ok": sensor_ok,
     }
     client.publish(TOPIC_STATUS, json.dumps(status).encode(), retain=True)
 
@@ -88,6 +94,15 @@ def main():
     while True:
         wdt.feed()
         try:
+            if not sensor_present():
+                # Kein ADS1115 am I2C-Bus gefunden (z.B. beim Testen ohne angeschlossene
+                # Messhardware) - keine Messung versuchen, nur den Status melden.
+                publish_status(client, interval, sensor_ok=False)
+                last_mm = None
+                interval = config.INTERVAL_LONG_S
+                sleep_with_wdt(interval)
+                continue
+
             mm = level_mm()
             liters = round(mm * LITERS_PER_MM)
             percent = round(100 * mm / config.MAX_LEVEL_MM)
@@ -95,7 +110,7 @@ def main():
             client.publish(TOPIC_MM, str(round(mm)).encode(), retain=True)
             client.publish(TOPIC_LITER, str(liters).encode(), retain=True)
             client.publish(TOPIC_PERCENT, str(percent).encode(), retain=True)
-            publish_status(client, interval)
+            publish_status(client, interval, sensor_ok=True)
 
             if last_mm is not None and abs(mm - last_mm) > config.CHANGE_THRESHOLD_MM:
                 interval = config.INTERVAL_SHORT_S
