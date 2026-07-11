@@ -2,6 +2,7 @@ mosquitto/data/
 mosquitto/log/
 mosquitto/config/passwd
 esp32/config.py
+esp32/ads1x15.py
 __pycache__/
 *.pyc
 .DS_Store

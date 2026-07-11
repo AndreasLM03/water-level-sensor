@@ -72,7 +72,15 @@ def sleep_with_wdt(seconds, step=5):
 
 
 def main():
-    client = connect_mqtt()
+    client = None
+    while client is None:
+        wdt.feed()
+        try:
+            client = connect_mqtt()
+        except OSError:
+            print("MQTT-Broker nicht erreichbar, naechster Versuch in 5s")
+            sleep_with_wdt(5)
+
     interval = config.INTERVAL_LONG_S
     last_mm = None
     stable_count = 0
