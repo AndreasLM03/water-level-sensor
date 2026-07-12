@@ -46,7 +46,7 @@ Ich habe bewusst gegen ein paar naheliegende Alternativen entschieden — hier d
 | **Eine 12V-Quelle für alles** | Getrennte 12V (Sensor) + 5V (ESP32) Netzteile | Community-Berichte bestätigen, dass der TL-136 im Bereich 12-36V zuverlässig läuft — 24V wäre unnötig und ineffizienter. Ein Buck-Wandler 12V→5V spart ein Netzteil und sorgt nebenbei für eine einzige gemeinsame Masse. |
 
 **Ehrliche Grenzen dieses Ansatzes:**
-- Die Umrechnung mm→Liter ist eine lineare Näherung (Gesamtvolumen ÷ Gesamthöhe). Bei einer Zisterne mit gewölbtem Boden/Deckel ist das nicht exakt — für "wie voll ist ungefähr meine Zisterne" reicht es, für Abrechnungszwecke nicht.
+- Die Umrechnung mm→Liter nutzt eine Kreissegment-Formel für liegende Rundtanks (siehe [Volumenformel](#volumenformel-mm--liter) unten) und ist damit deutlich genauer als eine lineare Näherung, aber immer noch eine Idealisierung: Anschlussstutzen, die Verbindung zum Domschacht und leichte Fertigungsabweichungen bildet sie nicht exakt ab. Für "wie voll ist ungefähr meine Zisterne" mehr als ausreichend, für Abrechnungszwecke nicht.
 - Drucksensoren dieser Preisklasse referenzieren über ein feines Belüftungsröhrchen im Kabel gegen den Luftdruck. Wird dieses Röhrchen versehentlich abgedichtet (z.B. beim Verpressen der Kabeldurchführung), driftet die Messung mit dem Wetter statt nur mit dem Wasserstand. Im Betrieb selten dominant, aber gelegentlich mit dem Zollstock gegenprüfen schadet nicht.
 - Elektronik in/an der Zisterne altert durch Feuchtigkeit und Frost-Tau-Wechsel schneller als im Haus — die Sonde ist dafür ausgelegt (IP68), die ESP32-Box nicht (deshalb oberirdisch, trocken, siehe Schritt 6).
 
@@ -89,6 +89,21 @@ Ich habe bewusst gegen ein paar naheliegende Alternativen entschieden — hier d
 2. Sonde bis zu dieser Tiefe eintauchen, 30s warten, Spannung ablesen → **U₁** bei **H1_MM = 1000**.
 3. In `esp32/config.py` eintragen: `U0`, `U1`, `H1_MM`. Der Rest (`K`) wird in `main.py` automatisch berechnet.
 4. **Warum das funktioniert, egal wie ungenau der Widerstand ist:** Die Formel `K = H1_MM / (U1 - U0)` nutzt deine *gemessenen* Spannungen, nicht den Nennwert des Widerstands oder Herstellerangaben — Fertigungstoleranzen kürzen sich dadurch automatisch raus.
+
+## Volumenformel: mm → Liter
+
+Bei einem liegenden Rundtank (z.B. [4rain Erdtank DUO](https://www.4rain.de)) ist der Zusammenhang zwischen Füllhöhe und Volumen **keine Gerade** — der Tank ist in der Mitte am breitesten und läuft oben/unten spitz zu, füllt sich dort also langsamer pro Millimeter. `main.py` rechnet deshalb mit der Kreissegment-Formel:
+
+```
+A(h) = r² · arccos((r-h)/r) - (r-h) · √(2rh - h²)      # Querschnittsflaeche bei Fuellhoehe h
+Liter(h) = A(h) · Tanklaenge · Tankanzahl / 1.000.000  # mm³ -> Liter
+```
+
+`r` = `TANK_RADIUS_MM` (Durchmesser laut Datenblatt / 2), `Tanklaenge` = `TANK_LENGTH_MM`, `Tankanzahl` = `TANK_COUNT`. Bei einer DUO-Zisterne mit zwei kommunizierenden Tanks (gleicher Wasserstand in beiden) `TANK_COUNT = 2`, bei einem einzelnen liegenden Rundtank `1`.
+
+Die idealisierte Formel ergibt bei komplett vollem Tank meist etwas mehr als die Herstellerangabe (Wandstärke, Rippenstruktur, Anschlüsse nehmen realen Platz weg) — deshalb wird das Ergebnis automatisch auf `TOTAL_LITERS` skaliert, die **Form** der Kurve bleibt dabei korrekt erhalten.
+
+**Andere Zisternenform?** Bei einer stehenden, zylindrischen oder eckigen Zisterne ist der Zusammenhang tatsächlich linear — dort reicht `Liter(h) = h · TOTAL_LITERS / MAX_LEVEL_MM`. Sag Bescheid, falls du das brauchst, dann tausche ich die Formel in `main.py` entsprechend.
 
 ## Schritt 4: Firmware (MicroPython)
 

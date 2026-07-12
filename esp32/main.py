@@ -1,4 +1,5 @@
 import time
+import math
 import network
 import json
 import config
@@ -7,7 +8,24 @@ from ads1x15 import ADS1115
 from umqtt.robust import MQTTClient
 
 K = config.H1_MM / (config.U1 - config.U0)  # mm pro Volt, aus Kalibrierwerten abgeleitet
-LITERS_PER_MM = config.TOTAL_LITERS / config.MAX_LEVEL_MM  # lineare Naeherung, siehe README
+
+# Volumenformel fuer liegende Rundtanks (Kreissegment) statt linearer Naeherung -
+# siehe README "Volumenformel". _VOLUME_CORRECTION gleicht die idealisierte
+# Geometrie an die reale Herstellerangabe TOTAL_LITERS an (Wandstaerke, Rippen,
+# Anschluesse verringern das tatsaechliche Volumen gegenueber der reinen Formel).
+_FULL_AREA_MM2 = math.pi * config.TANK_RADIUS_MM ** 2
+_THEORETICAL_FULL_LITERS = _FULL_AREA_MM2 * config.TANK_LENGTH_MM * config.TANK_COUNT / 1000000
+_VOLUME_CORRECTION = config.TOTAL_LITERS / _THEORETICAL_FULL_LITERS
+
+
+def liters_from_mm(h_mm):
+    r = config.TANK_RADIUS_MM
+    h = max(0, min(h_mm, 2 * r))
+    if h <= 0:
+        return 0
+    area_mm2 = r * r * math.acos((r - h) / r) - (r - h) * math.sqrt(2 * r * h - h * h)
+    volume_liters = area_mm2 * config.TANK_LENGTH_MM * config.TANK_COUNT / 1000000
+    return volume_liters * _VOLUME_CORRECTION
 
 TOPIC_MM = b"zisterne/fuellstand/mm"
 TOPIC_LITER = b"zisterne/fuellstand/liter"
@@ -107,7 +125,7 @@ def main():
                 continue
 
             mm = level_mm()
-            liters = round(mm * LITERS_PER_MM)
+            liters = round(liters_from_mm(mm))
             percent = round(100 * mm / config.MAX_LEVEL_MM)
 
             client.publish(TOPIC_MM, str(round(mm)).encode(), retain=True)
