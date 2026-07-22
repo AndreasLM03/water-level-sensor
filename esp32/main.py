@@ -2,6 +2,7 @@ import time
 import math
 import network
 import json
+import gc
 import config
 from machine import Pin, I2C
 from ads1x15 import ADS1115
@@ -82,6 +83,7 @@ def publish_status(client, interval, sensor_ok):
         "uptime_s": time.ticks_ms() // 1000,
         "interval_s": interval,
         "sensor_ok": sensor_ok,
+        "mem_free": gc.mem_free(),
     }
     client.publish(TOPIC_STATUS, json.dumps(status).encode(), retain=True)
 
