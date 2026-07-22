@@ -45,8 +45,7 @@ def sensor_present():
 
 
 def read_voltage(samples=8):
-    # Mittelwert mehrerer Messungen daempft Rauschen, damit CHANGE_THRESHOLD_MM
-    # nicht durch elektrisches Rauschen statt durch echte Pegelaenderung ausgeloest wird.
+    # Mittelwert mehrerer Messungen daempft elektrisches Rauschen.
     total = 0.0
     for _ in range(samples):
         raw = ads.read(rate=4, channel1=0)
@@ -89,7 +88,7 @@ def publish_status(client, interval, sensor_ok):
 
 
 def sleep_with_wdt(seconds, step=5):
-    # Der Watchdog-Timeout (60s, siehe boot.py) ist kuerzer als INTERVAL_LONG_S (300s).
+    # Der Watchdog-Timeout (120s, siehe boot.py) ist kuerzer als INTERVAL_S (300s).
     # Deshalb hier haeppchenweise schlafen und zwischendurch feed() aufrufen - sonst
     # resettet der Watchdog den ESP32 waehrend eines normalen 5-Minuten-Intervalls.
     remaining = seconds
@@ -110,20 +109,14 @@ def main():
             print("MQTT-Broker nicht erreichbar, naechster Versuch in 5s")
             sleep_with_wdt(5)
 
-    interval = config.INTERVAL_LONG_S
-    last_mm = None
-    stable_count = 0
-
     while True:
         wdt.feed()
         try:
             if not sensor_present():
                 # Kein ADS1115 am I2C-Bus gefunden (z.B. beim Testen ohne angeschlossene
                 # Messhardware) - keine Messung versuchen, nur den Status melden.
-                publish_status(client, interval, sensor_ok=False)
-                last_mm = None
-                interval = config.INTERVAL_LONG_S
-                sleep_with_wdt(interval)
+                publish_status(client, config.INTERVAL_S, sensor_ok=False)
+                sleep_with_wdt(config.INTERVAL_S)
                 continue
 
             mm = level_mm()
@@ -133,17 +126,7 @@ def main():
             client.publish(TOPIC_MM, str(round(mm)).encode(), retain=True)
             client.publish(TOPIC_LITER, str(liters).encode(), retain=True)
             client.publish(TOPIC_PERCENT, str(percent).encode(), retain=True)
-            publish_status(client, interval, sensor_ok=True)
-
-            if last_mm is not None and abs(mm - last_mm) > config.CHANGE_THRESHOLD_MM:
-                interval = config.INTERVAL_SHORT_S
-                stable_count = 0
-            else:
-                stable_count += 1
-                if stable_count >= config.STABLE_COUNT_TARGET:
-                    interval = config.INTERVAL_LONG_S
-
-            last_mm = mm
+            publish_status(client, config.INTERVAL_S, sensor_ok=True)
 
         except OSError:
             # Nicht blind MQTT neu verbinden - falls das WLAN selbst weg ist
@@ -156,7 +139,7 @@ def main():
                 time.sleep(5)
                 continue
 
-        sleep_with_wdt(interval)
+        sleep_with_wdt(config.INTERVAL_S)
 
 
 main()

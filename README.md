@@ -8,7 +8,7 @@ Kein Cloud-Dienst, keine App, kein Abo. Ein Sensor im Wasser, ein Mikrocontrolle
 
 ## Was das hier macht
 
-Eine vergrabene Regenwasser-Zisterne (hier: 5300l) bekommt einen Drucksensor, der ihren Füllstand kontinuierlich misst. Ein ESP32 liest den Sensor aus, rechnet ihn in Liter um und schickt das Ergebnis per MQTT ins Heimnetz. Standardmäßig alle 5 Minuten — ändert sich der Füllstand aber gerade stark (z.B. während es regnet oder die Gartenpumpe läuft), schaltet die Firmware automatisch auf alle 20 Sekunden hoch, bis sich der Wert wieder beruhigt hat.
+Eine vergrabene Regenwasser-Zisterne (hier: 5300l) bekommt einen Drucksensor, der ihren Füllstand kontinuierlich misst. Ein ESP32 liest den Sensor aus, rechnet ihn in Liter um und schickt das Ergebnis in einem festen Intervall (Standard: alle 5 Minuten) per MQTT ins Heimnetz.
 
 ```mermaid
 flowchart TB
@@ -21,15 +21,6 @@ flowchart TB
     ADS -- I2C --> ESP
     ESP -- MQTT --> BROKER["Mosquitto<br/>(Docker)"]
     BROKER -- MQTT --> LOX["Loxone Miniserver /<br/>Home Assistant / ioBroker"]
-```
-
-```mermaid
-stateDiagram-v2
-    [*] --> Normal
-    Normal --> Schnell: Änderung > Schwellwert
-    Schnell --> Schnell: weiterhin Änderung > Schwellwert
-    Schnell --> Normal: 5x in Folge stabil
-    Normal --> Normal: keine große Änderung
 ```
 
 ## Warum diese Bauteile (und nicht andere)?
@@ -133,15 +124,7 @@ Die idealisierte Formel ergibt bei komplett vollem Tank meist etwas mehr als die
    ```
 2. Erst wenn WLAN, Sensor und MQTT einzeln funktionieren: ESP32 einmal resetten (Knopf oder Stecker) — ab da läuft `main.py` automatisch beim Einschalten, auch ohne PC. Das ist der Produktivbetrieb.
 3. **Debugging nach dem Einbau (kein USB-Zugriff mehr):** Das Topic `zisterne/status` enthält WLAN-Signalstärke, Laufzeit, aktuelles Messintervall, `sensor_ok` (ob der ADS1115 gerade am I2C-Bus gefunden wird) und `mem_free` (freier Heap-Speicher in Byte) als JSON — mit z.B. **MQTT Explorer** von unterwegs prüfbar. Ist keine Messhardware angeschlossen (z.B. beim Software-Test), sendet der ESP32 weiterhin brav seinen Status mit `sensor_ok: false`, versucht aber keine Messung. `mem_free` lohnt sich bei einem Gerät, das über Monate/Jahre durchlaufen soll, gelegentlich im Blick zu behalten — ein stetig sinkender Wert über Wochen wäre ein Hinweis auf ein Speicherleck, lange bevor es zum Absturz kommt.
-4. Der Watchdog (`machine.WDT`, siehe `boot.py`) setzt den ESP32 automatisch zurück, falls die Schleife hängt. **Wichtig:** Sein Timeout (60s) ist kürzer als das lange Messintervall (300s) — deshalb schläft `main.py` in 5-Sekunden-Häppchen mit `feed()` dazwischen, statt am Stück 300s zu schlafen. Ohne diesen Kniff würde sich der ESP32 alle 5 Minuten selbst neu starten.
-
-### Schwellwert für die adaptive Frequenz ermitteln
-
-`CHANGE_THRESHOLD_MM` in `config.py` ist ein Startwert, kein Naturgesetz — er muss zur tatsächlichen Rauschstreuung deines Aufbaus passen:
-
-1. Nach der Installation, bei ruhigem Wasserstand, 20x hintereinander `level_mm()` in der REPL aufrufen und die Werte notieren.
-2. Die Streuung (max − min) ablesen.
-3. `CHANGE_THRESHOLD_MM` auf das 3-5-fache dieser Streuung setzen. Zu niedrig → das System schaltet ständig grundlos auf die schnelle Frequenz; zu hoch → echte Änderungen werden erst spät erkannt.
+4. Der Watchdog (`machine.WDT`, siehe `boot.py`) setzt den ESP32 automatisch zurück, falls die Schleife hängt. **Wichtig:** Sein Timeout (120s) ist kürzer als `INTERVAL_S` (Standard 300s) — deshalb schläft `main.py` in 5-Sekunden-Häppchen mit `feed()` dazwischen, statt am Stück durchzuschlafen. Ohne diesen Kniff würde sich der ESP32 bei jedem Intervall selbst neu starten.
 
 ## Schritt 5: MQTT-Broker (Mosquitto per Docker)
 
@@ -183,8 +166,7 @@ Der Loxone Miniserver (Gen 2 bzw. aktuelle Firmware) ist ein **MQTT-Client**, ke
 | `i2c.scan()` liefert `[]` | SDA/SCL vertauscht, oder ADS1115 bekommt keine 5V |
 | Spannung an Knotenpunkt A bleibt bei 0V | Sensor-Loop unterbrochen, Polarität der Sonde prüfen |
 | Wert driftet langsam über Tage, ohne dass sich der Pegel ändert | Belüftungsröhrchen der Sonde blockiert (Luftdruck statt Wasserdruck), oder Kalibrierpunkt neu aufnehmen |
-| ESP32 resettet ungefähr alle 5 Minuten | Watchdog-Fix aus Schritt 4 fehlt/wurde entfernt |
-| Ständig im "schnellen" Messintervall | `CHANGE_THRESHOLD_MM` zu niedrig für das reale Rauschen, siehe Schritt 4 |
+| ESP32 resettet ungefähr im Takt von `INTERVAL_S` | Watchdog-Fix aus Schritt 4 fehlt/wurde entfernt |
 | MQTT verbindet nicht | Broker-IP/Zugangsdaten in `esp32/config.py` prüfen, `mosquitto_sub` vom PC aus testen |
 | `ImportError: no module named 'config'` | `config.py` fehlt auf dem ESP32 — `config.example.py` kopieren, ausfüllen, hochladen |
 

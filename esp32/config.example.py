@@ -30,11 +30,4 @@ TANK_COUNT = 2         # Anzahl kommunizierender, baugleicher Tanks
 MAX_LEVEL_MM = 1300    # praktische Fuellhoehe = 2x TANK_RADIUS_MM, am Ueberlauf pruefen
 TOTAL_LITERS = 5300    # Herstellerangabe - verankert die Formel auf das reale Gesamtvolumen
 
-# Schwellwert fuer die adaptive Messfrequenz - MUSS nach der Installation anhand
-# der tatsaechlichen Rauschstreuung kalibriert werden (siehe README "Schwellwert ermitteln")
-CHANGE_THRESHOLD_MM = 8
-
-# --- Adaptive Messfrequenz ---
-INTERVAL_LONG_S = 300    # Normalfall: alle 5 Minuten
-INTERVAL_SHORT_S = 20    # bei starker Aenderung: alle 20s
-STABLE_COUNT_TARGET = 5  # so viele ruhige Messungen in Folge, bevor zurueck auf INTERVAL_LONG_S
+INTERVAL_S = 300  # Messintervall in Sekunden, fest (keine adaptive Frequenz mehr)
